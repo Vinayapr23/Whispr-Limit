@@ -461,15 +461,61 @@ const confirmTxs = async (signatures: string[]) => {
   await confirm(sig);
 });
 
-  // CPI Swap
-  it("Swap", async () => {
+
+// Comprehensive monitoring including SOL balance and pool state
+const getComprehensiveStatus = async (title: string) => {
+  console.log(`\n💰 === ${title} ===`);
+  
+  try {
+    // 1. User SOL balance
+    const solBalance = await connection.getBalance(creator.publicKey);
+    console.log(`User SOL Balance: ${solBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
+    
+    // 2. User token balances
+    const wsolBalance = await connection.getTokenAccountBalance(creator_base_ata);
+    const tokenBalance = await connection.getTokenAccountBalance(creator_token_ata);
+    console.log(`User WSOL: ${wsolBalance.value.uiAmountString || wsolBalance.value.amount}`);
+    console.log(`User Tokens: ${tokenBalance.value.uiAmountString || tokenBalance.value.amount}`);
+    
+    // 3. Pool vault balances
+    const vault0 = await connection.getTokenAccountBalance(token_vault_0);
+    const vault1 = await connection.getTokenAccountBalance(token_vault_1);
+    console.log(`Pool WSOL Vault: ${vault0.value.amount}`);
+    console.log(`Pool Token Vault: ${vault1.value.amount}`);
+    
+    // 4. LP token info
     try {
+      const lpBalance = await connection.getTokenAccountBalance(lp_mint_ata);
+      console.log(`User LP Tokens: ${lpBalance.value.amount}`);
+    } catch (e) {
+      console.log(`User LP Tokens: Account not found or 0`);
+    }
+    
+    // 5. Pool state account info (if you want to see raw pool data)
+    const poolAccountInfo = await connection.getAccountInfo(pool_state);
+    if (poolAccountInfo) {
+      console.log(`Pool State Account Size: ${poolAccountInfo.data.length} bytes`);
+      console.log(`Pool State Owner: ${poolAccountInfo.owner.toBase58()}`);
+    }
+    
+  } catch (error) {
+    console.log(`Error getting comprehensive status: ${error}`);
+  }
+  
+  console.log(`================================\n`);
+};
+
+// Usage in your test:
+it("Swap with Comprehensive Monitoring", async () => {
+  try {
+    // Monitor BEFORE
+    await getComprehensiveStatus("BEFORE SWAP");
 
     let amount_in = new BN(100000); 
     await new Promise(f => setTimeout(f, 1000));
+    
     const swapIx = await program.methods
-      .swap(amount_in, new BN(500)
-    )
+      .swap(amount_in, new BN(500))
       .accountsPartial({
         cpSwapProgram: CPMM_PROGRAM_ID,
         creator: creator.publicKey,
@@ -487,15 +533,66 @@ const confirmTxs = async (signatures: string[]) => {
         observationState: observation_state
       })
       .signers([creator])
-
       .rpc({ skipPreflight: true })
       .then(confirm);
 
+    // Monitor AFTER
+    await getComprehensiveStatus("AFTER SWAP");
+
+    console.log(`✅ Swap completed successfully!`);
+    console.log(`📝 Transaction: ${swapIx}`);
 
   } catch (error) {
-    console.error("\UNIT TEST *Swap* ERROR -", error.message);
+    console.error("UNIT TEST *Swap* ERROR -", error.message);
   }
 });
+
+
+
+
+
+
+
+
+//   // CPI Swap
+//   it("Swap", async () => {
+//     try {
+
+//     let amount_in = new BN(100000); 
+//     await new Promise(f => setTimeout(f, 1000));
+//     const swapIx = await program.methods
+//       .swap(amount_in, new BN(500)
+//     )
+//       .accountsPartial({
+//         cpSwapProgram: CPMM_PROGRAM_ID,
+//         creator: creator.publicKey,
+//         authority: authority,
+//         ammConfig: AMM_CONFIG_ID,
+//         poolState: pool_state,
+//         inputTokenAccount: creator_base_ata,
+//         outputTokenAccount: creator_token_ata,
+//         inputVault: token_vault_0,
+//         outputVault: token_vault_1,
+//         inputTokenProgram: TOKEN_PROGRAM_ID,
+//         outputTokenProgram: TOKEN_PROGRAM_ID,
+//         inputTokenMint: WSOL_ID,
+//         outputTokenMint: token_mint.publicKey,
+//         observationState: observation_state
+//       })
+//       .signers([creator])
+
+//       .rpc({ skipPreflight: true })
+//       .then(confirm);
+
+
+//   } catch (error) {
+//     console.error("\UNIT TEST *Swap* ERROR -", error.message);
+//   }
+// });
+
+
+
+
   // CPI Harvest the locked liquidity
   it("Harvest the locked liquidity", async () => {
     try {
