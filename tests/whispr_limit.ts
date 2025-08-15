@@ -38,6 +38,7 @@ describe("WhisprLimit", () => {
   const provider = anchor.getProvider();
     const connection = provider.connection;
 
+    
   
   type Event = anchor.IdlEvents<(typeof program)["idl"]>;
   const awaitEvent = async <E extends keyof Event>(
@@ -55,6 +56,8 @@ describe("WhisprLimit", () => {
   };
 
   const arciumEnv = getArciumEnv();
+
+ 
 
  // Helper function to log a message  
  const log = async (signature: string): Promise<string> => {
@@ -78,7 +81,6 @@ const confirmTx = async (signature: string) => {
 const confirmTxs = async (signatures: string[]) => {
   await Promise.all(signatures.map(confirmTx))
 }
-
 
 
   // Helper function to log the transaction signature
@@ -536,9 +538,6 @@ const confirmTxs = async (signatures: string[]) => {
 });
 
 
-
-
-
   it("Is initialized!", async () => {
     const owner = readKpJson(`${os.homedir()}/.config/solana/id.json`);
 
@@ -674,30 +673,6 @@ const confirmTxs = async (signatures: string[]) => {
     return sig;
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
