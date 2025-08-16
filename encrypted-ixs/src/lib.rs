@@ -4,15 +4,31 @@ use arcis_imports::*;
 mod circuits {
     use arcis_imports::*;
 
-    pub struct InputValues {
-        v1: u8,
-        v2: u8,
+    // Simple struct with just amount
+    pub struct SwapAmount {
+        amount: u64,
+        min_amount: u64,
+    }
+
+    // Return struct with both amounts
+    #[derive(Debug, Clone)]
+    pub struct SwapResult {
+        pub execute: u64,
+        pub withdraw_amount: u64,
     }
 
     #[instruction]
-    pub fn add_together(input_ctxt: Enc<Shared, InputValues>) -> Enc<Shared, u16> {
-        let input = input_ctxt.to_arcis();
-        let sum = input.v1 as u16 + input.v2 as u16;
-        input_ctxt.owner.from_arcis(sum)
+    pub fn compute_swap(swap_amount_ctxt: Enc<Shared, SwapAmount>) -> Enc<Shared, SwapResult> {
+        // Return revealed struct
+        let swap_amount = swap_amount_ctxt.to_arcis();
+        let amount: u64 = swap_amount.amount;
+        let min_amount: u64 = swap_amount.min_amount;
+
+        let result = SwapResult {
+            execute: 0,
+            withdraw_amount: min_amount,
+        };
+
+        swap_amount_ctxt.owner.from_arcis(result)
     }
 }

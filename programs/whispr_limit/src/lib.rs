@@ -5,15 +5,17 @@ pub mod contexts;
 pub use contexts::*;
 mod constants;
 
-const COMP_DEF_OFFSET_ADD_TOGETHER: u32 = comp_def_offset("add_together");
+const COMP_DEF_OFFSET_COMPUTE_SWAP: u32 = comp_def_offset("compute_swap");
 
 declare_id!("ANiRvrRWgEbLL9BUqqgr8mhbNhbX1dzPdph9UiQtubRt");
 
 #[arcium_program]
 pub mod whispr_limit {
+    use arcium_client::idl::arcium::types::CallbackAccount;
+
     use super::*;
-    
-     pub fn create_cpmm_pool(
+
+    pub fn create_cpmm_pool(
         ctx: Context<CreateCpmmPool>,
         funding_amount: Option<u64>,
     ) -> Result<()> {
@@ -31,54 +33,89 @@ pub mod whispr_limit {
         ctx.accounts.swap(amount_in, minimum_amount_out)
     }
 
-
-    pub fn init_add_together_comp_def(ctx: Context<InitAddTogetherCompDef>) -> Result<()> {
+    pub fn init_compute_swap_comp_def(ctx: Context<InitComputeSwapCompDef>) -> Result<()> {
         init_comp_def(ctx.accounts, true, 0, None, None)?;
         Ok(())
     }
 
-    pub fn add_together(
-        ctx: Context<AddTogether>,
+    pub fn compute_swap(
+        ctx: Context<ComputeSwap>,
         computation_offset: u64,
-        ciphertext_0: [u8; 32],
-        ciphertext_1: [u8; 32],
         pub_key: [u8; 32],
         nonce: u128,
+        encrypted_amount: [u8; 32],     // Encrypted u64
+        encrypted_min_amount: [u8; 32], // encrypted_min_output: [u8; 32], // Encrypted u64
     ) -> Result<()> {
+        // Initialize swap state
+        let clock = Clock::get()?;
+        ctx.accounts.swap_state.user = ctx.accounts.user.key();
+        ctx.accounts.swap_state.computation_offset = computation_offset;
+        ctx.accounts.swap_state.amount = 0;
+        ctx.accounts.swap_state.min_output = 0;
+        ctx.accounts.swap_state.status = SwapStatus::Initiated;
+        ctx.accounts.swap_state.created_at = clock.unix_timestamp;
+
+        // Pass three encrypted values separately
         let args = vec![
             Argument::ArcisPubkey(pub_key),
             Argument::PlaintextU128(nonce),
-            Argument::EncryptedU8(ciphertext_0),
-            Argument::EncryptedU8(ciphertext_1),
+            Argument::EncryptedU64(encrypted_amount), // amount
+            Argument::EncryptedU64(encrypted_min_amount), // min_output
         ];
-        queue_computation(ctx.accounts, computation_offset, args, vec![], None)?;
+
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            vec![CallbackAccount {
+                pubkey: ctx.accounts.user.key(),
+                is_writable: true,
+            }],
+            None,
+        )?;
+        ctx.accounts.swap_state.status = SwapStatus::Computing;
+
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "add_together")]
-    pub fn add_together_callback(
-        ctx: Context<AddTogetherCallback>,
-        output: ComputationOutputs<AddTogetherOutput>,
+    #[arcium_callback(encrypted_ix = "compute_swap")]
+    pub fn compute_swap_callback(
+        ctx: Context<ComputeSwapCallback>,
+        output: ComputationOutputs<ComputeSwapOutput>,
     ) -> Result<()> {
-        let o = match output {
-            ComputationOutputs::Success(AddTogetherOutput { field_0: o }) => o,
+        // Extract results from MPC computation
+        let swap_result = match output {
+            ComputationOutputs::Success(ComputeSwapOutput { field_0 }) => field_0,
             _ => return Err(ErrorCode::AbortedComputation.into()),
         };
 
-        emit!(SumEvent {
-            sum: o.ciphertexts[0],
-            nonce: o.nonce.to_le_bytes(),
+        // Decrypt the results
+        // The circuit returns SwapResult
+        let execute = swap_result.ciphertexts[0];
+        // u64::from_le_bytes(swap_result.ciphertexts[0][..8].try_into().unwrap());
+
+        let withdraw_amount = swap_result.ciphertexts[1];
+        //u64::from_le_bytes(swap_result.ciphertexts[1][..8].try_into().unwrap());
+
+        emit!(ConfidentialSwapExecutedEvent {
+            user: ctx.accounts.user.key(),
+            execute,
+            withdraw_amount,
+            nonce: swap_result.nonce,
         });
+
         Ok(())
     }
 }
 
-#[queue_computation_accounts("add_together", payer)]
+#[queue_computation_accounts("compute_swap", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
-pub struct AddTogether<'info> {
+pub struct ComputeSwap<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub user: Signer<'info>,
     #[account(
         address = derive_mxe_pda!()
     )]
@@ -102,7 +139,7 @@ pub struct AddTogether<'info> {
     /// CHECK: computation_account, checked by the arcium program.
     pub computation_account: UncheckedAccount<'info>,
     #[account(
-        address = derive_comp_def_pda!(COMP_DEF_OFFSET_ADD_TOGETHER)
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_COMPUTE_SWAP)
     )]
     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
     #[account(
@@ -121,46 +158,98 @@ pub struct AddTogether<'info> {
     pub clock_account: Account<'info, ClockAccount>,
     pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
+
+    #[account(
+        init,
+        payer = user,
+        space = SwapState::INIT_SPACE,
+        seeds = [b"swap_state"],
+        bump
+    )]
+    pub swap_state: Box<Account<'info, SwapState>>,
 }
 
-#[callback_accounts("add_together", payer)]
+#[callback_accounts("compute_swap", payer)]
 #[derive(Accounts)]
-pub struct AddTogetherCallback<'info> {
+pub struct ComputeSwapCallback<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub arcium_program: Program<'info, Arcium>,
     #[account(
-        address = derive_comp_def_pda!(COMP_DEF_OFFSET_ADD_TOGETHER)
+        address = derive_comp_def_pda!(COMP_DEF_OFFSET_COMPUTE_SWAP)
     )]
     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
     #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
     /// CHECK: instructions_sysvar, checked by the account constraint
     pub instructions_sysvar: AccountInfo<'info>,
+    ///CHECK:doc
+    #[account(mut)]
+    pub user: AccountInfo<'info>,
 }
 
-#[init_computation_definition_accounts("add_together", payer)]
+#[init_computation_definition_accounts("compute_swap", payer)]
 #[derive(Accounts)]
-pub struct InitAddTogetherCompDef<'info> {
+pub struct InitComputeSwapCompDef<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(
-        mut,
-        address = derive_mxe_pda!()
-    )]
+    #[account(mut, address = derive_mxe_pda!())]
     pub mxe_account: Box<Account<'info, MXEAccount>>,
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program.
-    /// Can't check it here as it's not initialized yet.
     pub comp_def_account: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[event]
-pub struct SumEvent {
-    pub sum: [u8; 32],
-    pub nonce: [u8; 16],
+#[account]
+pub struct SwapState {
+    pub user: Pubkey,
+    pub computation_offset: u64,
+    //  pub is_x: bool,
+    pub amount: u64,
+    pub min_output: u64,
+    pub status: SwapStatus,
+    pub created_at: i64,
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum SwapStatus {
+    Initiated,
+    Computing,
+    Computed,
+    Executed,
+    Failed,
+}
+
+impl Space for SwapState {
+    const INIT_SPACE: usize = 8 + 32 + 8 + 8 + 8 + 1 + 8;
+}
+
+#[event]
+pub struct ConfidentialSwapInitiatedEvent {
+    pub user: Pubkey,
+    pub config: Pubkey,
+    pub computation_offset: u64,
+}
+
+#[event]
+pub struct ConfidentialSwapExecutedEvent {
+    pub user: Pubkey,
+    pub execute: [u8; 32],
+    pub withdraw_amount: [u8; 32],
+    pub nonce: u128,
+    // pub is_x: bool,
+}
+
+#[event]
+pub struct ConfidentialSwapFailedEvent {
+    pub user: Pubkey,
+    pub config: Pubkey,
+    pub computation_offset: u64,
+    pub reason: String,
+}
+
+// ========================= ERRORS =========================
 
 #[error_code]
 pub enum ErrorCode {
@@ -168,4 +257,12 @@ pub enum ErrorCode {
     AbortedComputation,
     #[msg("Cluster not set")]
     ClusterNotSet,
+    #[msg("This pool is locked")]
+    PoolLocked,
+    #[msg("Slippage exceeded")]
+    SlippageExceded,
+    #[msg("Invalid Amount")]
+    InvalidAmount,
+    #[msg("Invalid update authority")]
+    InvalidAuthority,
 }
