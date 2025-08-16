@@ -664,11 +664,15 @@ describe("WhisprLimit", () => {
     const swapAmount = BigInt(10 * Math.pow(10, DECIMALS));
     const minOutput = BigInt(8 * Math.pow(10, DECIMALS));
 
+    const amount =[swapAmount,minOutput];
     const nonce = randomBytes(16);
-    const ciphertextAmount = cipher.encrypt([swapAmount], nonce);
+    // const ciphertextAmount = cipher.encrypt([swapAmount], nonce);
 
 
-    const ciphertextMinOutput = cipher.encrypt([minOutput], nonce);
+    // const ciphertextMinOutput = cipher.encrypt([minOutput], nonce);
+
+    const ciphertextAmount = cipher.encrypt(amount,nonce)
+
 
     const swapExecutedEventPromise = awaitEvent(
       "confidentialSwapExecutedEvent"
@@ -690,7 +694,7 @@ describe("WhisprLimit", () => {
         Array.from(publicKey),
         new anchor.BN(deserializeLE(nonce).toString()),
         Array.from(ciphertextAmount[0]),
-        Array.from(ciphertextMinOutput[0])
+        Array.from(ciphertextAmount[1])
       )
       .accountsPartial({
         user: creator.publicKey,
