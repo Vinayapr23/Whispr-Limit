@@ -13,7 +13,20 @@ declare_id!("ANiRvrRWgEbLL9BUqqgr8mhbNhbX1dzPdph9UiQtubRt");
 pub mod whispr_limit {
     use arcium_client::idl::arcium::types::CallbackAccount;
 
+    use crate::instruction::LimitData;
+
     use super::*;
+    
+    pub fn limit_data(
+        ctx: Context<StoreLimitData>,
+        limit: [u8; 32],
+    ) -> Result<()> {
+        let data = &mut ctx.accounts.data;
+        data.limit = limit;
+        Ok(())
+    }
+
+
 
     pub fn create_cpmm_pool(
         ctx: Context<CreateCpmmPool>,
@@ -44,7 +57,7 @@ pub mod whispr_limit {
         pub_key: [u8; 32],
         nonce: u128,
         encrypted_amount: [u8; 32],     // Encrypted u64
-        encrypted_min_amount: [u8; 32], // encrypted_min_output: [u8; 32], // Encrypted u64
+       
     ) -> Result<()> {
         // Initialize swap state
         let clock = Clock::get()?;
@@ -55,12 +68,14 @@ pub mod whispr_limit {
         ctx.accounts.swap_state.status = SwapStatus::Initiated;
         ctx.accounts.swap_state.created_at = clock.unix_timestamp;
 
+       // msg!(stringify!(encrypted_amount==ctx.accounts.data.limit));
         // Pass three encrypted values separately
         let args = vec![
             Argument::ArcisPubkey(pub_key),
             Argument::PlaintextU128(nonce),
+              Argument::EncryptedU64(ctx.accounts.data.limit), // 
             Argument::EncryptedU64(encrypted_amount), // amount
-            Argument::EncryptedU64(encrypted_min_amount), // min_output
+          
         ];
 
         queue_computation(
@@ -108,14 +123,31 @@ pub mod whispr_limit {
     }
 }
 
+
+
+#[derive(Accounts)]
+pub struct StoreLimitData<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + LimitData::INIT_SPACE,
+        seeds = [b"limit_data", /*payer.key().as_ref()*/],
+        bump,
+    )]
+    pub data: Account<'info, LimitData>,
+}
+
+
 #[queue_computation_accounts("compute_swap", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct ComputeSwap<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut)]
-    pub user: Signer<'info>,
+
     #[account(
         address = derive_mxe_pda!()
     )]
@@ -159,6 +191,8 @@ pub struct ComputeSwap<'info> {
     pub system_program: Program<'info, System>,
     pub arcium_program: Program<'info, Arcium>,
 
+    #[account(mut)]
+    pub user: Signer<'info>,
     #[account(
         init,
         payer = user,
@@ -167,6 +201,17 @@ pub struct ComputeSwap<'info> {
         bump
     )]
     pub swap_state: Box<Account<'info, SwapState>>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + LimitData::INIT_SPACE,
+        seeds = [b"limit_data", /*payer.key().as_ref()*/],
+        bump,
+    )]
+    pub data: Account<'info, LimitData>,
+    
+
 }
 
 #[callback_accounts("compute_swap", payer)]
@@ -200,6 +245,13 @@ pub struct InitComputeSwapCompDef<'info> {
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct LimitData {
+    pub limit: [u8; 32],
+}
+
 
 #[account]
 pub struct SwapState {
