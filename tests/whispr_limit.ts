@@ -304,19 +304,19 @@ describe("WhisprLimit", () => {
     anchor.web3.PublicKey
   ] = [null, null];
   let lookupTableAccount: anchor.web3.AddressLookupTableAccount = null;
- // It creates an ALT
-    it("Initialize ALT \n", async () => {
+  // It creates an ALT
+  it("Initialize ALT \n", async () => {
+    const slot = await connection.getSlot();
 
-      const slot = await connection.getSlot();
+    [lookupTableInst, lookupTableAddress] =
+      anchor.web3.AddressLookupTableProgram.createLookupTable({
+        authority: creator.publicKey,
+        payer: creator.publicKey,
+        recentSlot: slot,
+      });
 
-      [lookupTableInst, lookupTableAddress] =
-        anchor.web3.AddressLookupTableProgram.createLookupTable({
-          authority: creator.publicKey,
-          payer: creator.publicKey,
-          recentSlot: slot,
-        });
-
-      const extendInstruction = anchor.web3.AddressLookupTableProgram.extendLookupTable({
+    const extendInstruction =
+      anchor.web3.AddressLookupTableProgram.extendLookupTable({
         payer: creator.publicKey,
         authority: creator.publicKey,
         lookupTable: lookupTableAddress,
@@ -330,64 +330,53 @@ describe("WhisprLimit", () => {
           RENT_PROGRAM,
           create_pool_fee,
           AMM_CONFIG_ID,
-          WSOL_ID
+          WSOL_ID,
           // list more publicKey addresses here
         ],
       });
-      lookupTableAccount = (
-        await connection.getAddressLookupTable(lookupTableAddress)
-      ).value;
+    lookupTableAccount = (
+      await connection.getAddressLookupTable(lookupTableAddress)
+    ).value;
 
-      // fetching the latest blockhash
-      let blockhash = await connection
-        .getLatestBlockhash()
-        .then(res => res.blockhash);
+    // fetching the latest blockhash
+    let blockhash = await connection
+      .getLatestBlockhash()
+      .then((res) => res.blockhash);
 
-      lookupTableAccount = (
-        await connection.getAddressLookupTable(lookupTableAddress)
-      ).value;
+    lookupTableAccount = (
+      await connection.getAddressLookupTable(lookupTableAddress)
+    ).value;
 
-      // creating a versioned message instead of leagacy
-      const messageV0 = new anchor.web3.TransactionMessage({
-        payerKey: creator.publicKey,
-        recentBlockhash: blockhash,
-        instructions: [lookupTableInst, extendInstruction]
-      }).compileToV0Message([])
+    // creating a versioned message instead of leagacy
+    const messageV0 = new anchor.web3.TransactionMessage({
+      payerKey: creator.publicKey,
+      recentBlockhash: blockhash,
+      instructions: [lookupTableInst, extendInstruction],
+    }).compileToV0Message([]);
 
-      // creating a versioned tx and using that to sendTransaction to avoid deprecation
-      const transaction = new anchor.web3.VersionedTransaction(messageV0);
+    // creating a versioned tx and using that to sendTransaction to avoid deprecation
+    const transaction = new anchor.web3.VersionedTransaction(messageV0);
 
-      // sign your transaction with the required `Signers`
-      transaction.sign([creator]);
+    // sign your transaction with the required `Signers`
+    transaction.sign([creator]);
 
-      // Step 3: Send and confirm the transaction with rpc skip preflight
-      const sig = await
-        anchor.getProvider()
-          .connection
-          // since we have already signed the tx, no need to pass the signers array again
-          .sendTransaction(
-            transaction,
-            {
-              skipPreflight: true,
-            }
-          )
-      // Confirm txn
-      await confirm(sig);
+    // Step 3: Send and confirm the transaction with rpc skip preflight
+    const sig = await anchor
+      .getProvider()
+      .connection// since we have already signed the tx, no need to pass the signers array again
+      .sendTransaction(transaction, {
+        skipPreflight: true,
+      });
+    // Confirm txn
+    await confirm(sig);
 
-      await new Promise(f => setTimeout(f, 1000));
-    });
+    await new Promise((f) => setTimeout(f, 1000));
+  });
 
-
-
-
-
-   // Test to create a raydium cpmm pool
-   it("Creates a Raydium cpmm pool and Locks the Lp", async () => {
-
+  // Test to create a raydium cpmm pool
+  it("Creates a Raydium cpmm pool and Locks the Lp", async () => {
     const createCpmmPool = await program.methods
-      .createCpmmPool(
-        null
-    )
+      .createCpmmPool(null)
       .accountsPartial({
         cpSwapProgram: CPMM_PROGRAM_ID,
         creator: creator.publicKey,
@@ -408,15 +397,13 @@ describe("WhisprLimit", () => {
         token1Program: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
-        rent: RENT_PROGRAM
-
+        rent: RENT_PROGRAM,
       })
       .signers([creator, token_mint])
-      .instruction()
+      .instruction();
 
     const lockCpiIx = await program.methods
-      .lockCpmmLiquidity(
-    )
+      .lockCpmmLiquidity()
       .accountsPartial({
         cpSwapProgram: CPMM_PROGRAM_ID,
         lockCpmmProgram: LOCK_CPMM_PROGRAM_ID,
@@ -439,17 +426,18 @@ describe("WhisprLimit", () => {
         rent: RENT_PROGRAM,
         tokenProgram: TOKEN_PROGRAM_ID,
         baseMint: WSOL_ID,
-        tokenMint: token_mint.publicKey
-
+        tokenMint: token_mint.publicKey,
       })
       .signers([creator, fee_nft_mint]) // Signer of the transaction
-      .instruction()
+      .instruction();
 
-      let blockhash = await connection
+    let blockhash = await connection
       .getLatestBlockhash()
-      .then(res => res.blockhash);
+      .then((res) => res.blockhash);
 
-    const setComputeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 600000 } as SetComputeUnitLimitParams);
+    const setComputeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+      units: 600000,
+    } as SetComputeUnitLimitParams);
 
     lookupTableAccount = (
       await connection.getAddressLookupTable(lookupTableAddress)
@@ -459,8 +447,8 @@ describe("WhisprLimit", () => {
     const messageV0 = new anchor.web3.TransactionMessage({
       payerKey: creator.publicKey,
       recentBlockhash: blockhash,
-      instructions: [setComputeUnitLimitIx, createCpmmPool, lockCpiIx]
-    }).compileToV0Message([lookupTableAccount])
+      instructions: [setComputeUnitLimitIx, createCpmmPool, lockCpiIx],
+    }).compileToV0Message([lookupTableAccount]);
 
     // creating a versioned tx and using that to sendTransaction to avoid deprecation
     const transaction = new anchor.web3.VersionedTransaction(messageV0);
@@ -468,16 +456,12 @@ describe("WhisprLimit", () => {
     // sign your transaction with the required `Signers`
     transaction.sign([creator, token_mint, fee_nft_mint]);
     // Step 3: Send and confirm the transaction with rpc skip preflight
-    const sig = await
-      anchor.getProvider()
-        .connection
-        // since we have already signed the tx, no need to pass the signers array again
-        .sendTransaction(
-          transaction,
-          {
-            skipPreflight: true,
-          }
-        )
+    const sig = await anchor
+      .getProvider()
+      .connection// since we have already signed the tx, no need to pass the signers array again
+      .sendTransaction(transaction, {
+        skipPreflight: true,
+      });
     // Confirm txn
     await confirm(sig);
   });
@@ -489,13 +473,27 @@ describe("WhisprLimit", () => {
     try {
       // 1. User SOL balance
       const solBalance = await connection.getBalance(creator.publicKey);
-      console.log(`User SOL Balance: ${solBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`);
+      console.log(
+        `User SOL Balance: ${solBalance / anchor.web3.LAMPORTS_PER_SOL} SOL`
+      );
 
       // 2. User token balances
-      const wsolBalance = await connection.getTokenAccountBalance(creator_base_ata);
-      const tokenBalance = await connection.getTokenAccountBalance(creator_token_ata);
-      console.log(`User WSOL: ${wsolBalance.value.uiAmountString || wsolBalance.value.amount}`);
-      console.log(`User Tokens: ${tokenBalance.value.uiAmountString || tokenBalance.value.amount}`);
+      const wsolBalance = await connection.getTokenAccountBalance(
+        creator_base_ata
+      );
+      const tokenBalance = await connection.getTokenAccountBalance(
+        creator_token_ata
+      );
+      console.log(
+        `User WSOL: ${
+          wsolBalance.value.uiAmountString || wsolBalance.value.amount
+        }`
+      );
+      console.log(
+        `User Tokens: ${
+          tokenBalance.value.uiAmountString || tokenBalance.value.amount
+        }`
+      );
 
       // 3. Pool vault balances
       const vault0 = await connection.getTokenAccountBalance(token_vault_0);
@@ -514,10 +512,11 @@ describe("WhisprLimit", () => {
       // 5. Pool state account info (if you want to see raw pool data)
       const poolAccountInfo = await connection.getAccountInfo(pool_state);
       if (poolAccountInfo) {
-        console.log(`Pool State Account Size: ${poolAccountInfo.data.length} bytes`);
+        console.log(
+          `Pool State Account Size: ${poolAccountInfo.data.length} bytes`
+        );
         console.log(`Pool State Owner: ${poolAccountInfo.owner.toBase58()}`);
       }
-
     } catch (error) {
       console.log(`Error getting comprehensive status: ${error}`);
     }
@@ -664,17 +663,15 @@ describe("WhisprLimit", () => {
     const sharedSecret = x25519.getSharedSecret(privateKey, mxePublicKey);
     const cipher = new RescueCipher(sharedSecret);
     const DECIMALS = 6;
-  
+
     const limitAmount = BigInt(5 * Math.pow(10, DECIMALS));
     const swapAmount = BigInt(10 * Math.pow(10, DECIMALS));
     const minOutput = BigInt(8 * Math.pow(10, DECIMALS));
 
-    const amount =[limitAmount,minOutput];
+    const amount = [limitAmount, minOutput];
     const nonce = randomBytes(16);
 
-
-    const ciphertextAmount = cipher.encrypt(amount,nonce)
-
+    const ciphertextAmount = cipher.encrypt(amount, nonce);
 
     const swapExecutedEventPromise = awaitEvent(
       "confidentialSwapExecutedEvent"
@@ -682,42 +679,24 @@ describe("WhisprLimit", () => {
 
     const computationOffset = new anchor.BN(randomBytes(8), "hex");
 
-    const swapStatePda = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("swap_state"),
-        // user.publicKey.toBuffer()
-      ],
-      program.programId
-    )[0];
-
-  const [limitDataPda] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("limit_data"),
-      //creator.publicKey.toBuffer()
-    ],
-    program.programId
-  );
-  
-
     const signature = await program.methods
-    .limitData(ciphertextAmount[0])
-    .accountsPartial({
-      payer: creator.publicKey,
-    })
-    .signers([creator])
-    .rpc();
-    
-  console.log("Limit data stored with signature:", signature);
+      .limitData(ciphertextAmount[0])
+      .accountsPartial({
+        payer: creator.publicKey,
+      })
+      .signers([creator])
+      .rpc();
+
+    console.log("Limit data stored with signature:", signature);
 
     const queueSig = await program.methods
       .computeSwap(
         computationOffset,
         Array.from(publicKey),
         new anchor.BN(deserializeLE(nonce).toString()),
-        Array.from(ciphertextAmount[1]),
+        Array.from(ciphertextAmount[1])
       )
       .accountsPartial({
-
         computationAccount: getComputationAccAddress(
           program.programId,
           computationOffset
@@ -731,10 +710,14 @@ describe("WhisprLimit", () => {
           Buffer.from(getCompDefAccOffset("compute_swap")).readUInt32LE()
         ),
         user: creator.publicKey,
-        swapState: swapStatePda,
-        data :limitDataPda,
-
-
+        swapState: PublicKey.findProgramAddressSync(
+          [Buffer.from("swap_state"), creator.publicKey.toBuffer()],
+          program.programId
+        )[0],
+        data: PublicKey.findProgramAddressSync(
+          [Buffer.from("limit_data"), creator.publicKey.toBuffer()],
+          program.programId
+        )[0],
       })
       .signers([creator])
       .rpc({ commitment: "confirmed" });
@@ -764,8 +747,8 @@ describe("WhisprLimit", () => {
       await getComprehensiveStatus("BEFORE SWAP");
 
       let amount_in = new BN(100000);
-        let minimum_amount_out = new BN(output[1].toString());
-      await new Promise(f => setTimeout(f, 1000));
+      let minimum_amount_out = new BN(output[1].toString());
+      await new Promise((f) => setTimeout(f, 1000));
 
       const swapIx = await program.methods
         .swap(amount_in, minimum_amount_out)
@@ -783,7 +766,7 @@ describe("WhisprLimit", () => {
           outputTokenProgram: TOKEN_PROGRAM_ID,
           inputTokenMint: WSOL_ID,
           outputTokenMint: token_mint.publicKey,
-          observationState: observation_state
+          observationState: observation_state,
         })
         .signers([creator])
         .rpc({ skipPreflight: true })
@@ -794,15 +777,9 @@ describe("WhisprLimit", () => {
 
       console.log(`✅ Swap completed successfully!`);
       console.log(`📝 Transaction: ${swapIx}`);
-
     } catch (error) {
       console.error("UNIT TEST *Swap* ERROR -", error.message);
     }
-
-
-
-
-
   });
 
   async function initComputeSwapCompDef(

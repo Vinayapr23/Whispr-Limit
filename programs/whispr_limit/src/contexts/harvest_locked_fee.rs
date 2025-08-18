@@ -33,7 +33,8 @@ pub struct HarvestLockedLiquidity<'info> {
         associated_token::mint = locked_liquidity.fee_nft_mint
     )]
     pub fee_nft_account: Account<'info, TokenAccount>,
-    #[account( 
+
+    #[account(
         mut,
         seeds = [
             LOCKED_LIQUIDITY_SEED.as_bytes(),
@@ -69,13 +70,13 @@ pub struct HarvestLockedLiquidity<'info> {
         bump,
     )]
     pub lp_mint: UncheckedAccount<'info>,
-    #[account(     
+    #[account(
         mut,
         associated_token::mint = base_mint,
         associated_token::authority = creator,
     )]
     pub base_vault: Box<Account<'info, TokenAccount>>,
-    #[account(     
+    #[account(
         mut,
         associated_token::mint = token_mint,
         associated_token::authority = creator,
@@ -105,7 +106,7 @@ pub struct HarvestLockedLiquidity<'info> {
         bump,
     )]
     pub token_1_vault: UncheckedAccount<'info>,
-    #[account(     
+    #[account(
         mut,
         associated_token::mint = lp_mint,
         associated_token::authority = authority,

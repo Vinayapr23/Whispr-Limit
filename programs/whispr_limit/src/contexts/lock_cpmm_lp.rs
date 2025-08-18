@@ -45,7 +45,7 @@ pub struct LockCpmmLiquidity<'info> {
     )]
     pub pool_state: UncheckedAccount<'info>,
     /// CHECK:
-    #[account( 
+    #[account(
         mut,
         seeds = [
             LOCKED_LIQUIDITY_SEED.as_bytes(),

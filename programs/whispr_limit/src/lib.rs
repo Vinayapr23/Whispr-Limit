@@ -16,17 +16,12 @@ pub mod whispr_limit {
     use crate::instruction::LimitData;
 
     use super::*;
-    
-    pub fn limit_data(
-        ctx: Context<StoreLimitData>,
-        limit: [u8; 32],
-    ) -> Result<()> {
+
+    pub fn limit_data(ctx: Context<StoreLimitData>, limit: [u8; 32]) -> Result<()> {
         let data = &mut ctx.accounts.data;
         data.limit = limit;
         Ok(())
     }
-
-
 
     pub fn create_cpmm_pool(
         ctx: Context<CreateCpmmPool>,
@@ -56,8 +51,7 @@ pub mod whispr_limit {
         computation_offset: u64,
         pub_key: [u8; 32],
         nonce: u128,
-        encrypted_amount: [u8; 32],     // Encrypted u64
-       
+        encrypted_amount: [u8; 32], // Encrypted u64
     ) -> Result<()> {
         // Initialize swap state
         let clock = Clock::get()?;
@@ -68,14 +62,13 @@ pub mod whispr_limit {
         ctx.accounts.swap_state.status = SwapStatus::Initiated;
         ctx.accounts.swap_state.created_at = clock.unix_timestamp;
 
-       // msg!(stringify!(encrypted_amount==ctx.accounts.data.limit));
+        // msg!(stringify!(encrypted_amount==ctx.accounts.data.limit));
         // Pass three encrypted values separately
         let args = vec![
             Argument::ArcisPubkey(pub_key),
             Argument::PlaintextU128(nonce),
-              Argument::EncryptedU64(ctx.accounts.data.limit), // 
-            Argument::EncryptedU64(encrypted_amount), // amount
-          
+            Argument::EncryptedU64(ctx.accounts.data.limit), //
+            Argument::EncryptedU64(encrypted_amount),        // amount
         ];
 
         queue_computation(
@@ -123,8 +116,6 @@ pub mod whispr_limit {
     }
 }
 
-
-
 #[derive(Accounts)]
 pub struct StoreLimitData<'info> {
     #[account(mut)]
@@ -134,12 +125,11 @@ pub struct StoreLimitData<'info> {
         init,
         payer = payer,
         space = 8 + LimitData::INIT_SPACE,
-        seeds = [b"limit_data", /*payer.key().as_ref()*/],
+        seeds = [b"limit_data", payer.key().as_ref()],
         bump,
     )]
     pub data: Account<'info, LimitData>,
 }
-
 
 #[queue_computation_accounts("compute_swap", payer)]
 #[derive(Accounts)]
@@ -197,21 +187,12 @@ pub struct ComputeSwap<'info> {
         init,
         payer = user,
         space = SwapState::INIT_SPACE,
-        seeds = [b"swap_state"],
+        seeds = [b"swap_state", user.key().as_ref()],
         bump
     )]
     pub swap_state: Box<Account<'info, SwapState>>,
 
-    #[account(
-        init_if_needed,
-        payer = payer,
-        space = 8 + LimitData::INIT_SPACE,
-        seeds = [b"limit_data", /*payer.key().as_ref()*/],
-        bump,
-    )]
     pub data: Account<'info, LimitData>,
-    
-
 }
 
 #[callback_accounts("compute_swap", payer)]
@@ -252,12 +233,10 @@ pub struct LimitData {
     pub limit: [u8; 32],
 }
 
-
 #[account]
 pub struct SwapState {
     pub user: Pubkey,
     pub computation_offset: u64,
-    //  pub is_x: bool,
     pub amount: u64,
     pub min_output: u64,
     pub status: SwapStatus,
