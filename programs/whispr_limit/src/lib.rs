@@ -7,7 +7,7 @@ mod constants;
 
 const COMP_DEF_OFFSET_COMPUTE_SWAP: u32 = comp_def_offset("compute_swap");
 
-declare_id!("ANiRvrRWgEbLL9BUqqgr8mhbNhbX1dzPdph9UiQtubRt");
+declare_id!("98Yy1MEB7nKGECxQXoAJGjrBngvsX5hjMkXESrR3stDs");
 
 #[arcium_program]
 pub mod whispr_limit {

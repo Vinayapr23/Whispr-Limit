@@ -741,7 +741,9 @@ describe("WhisprLimit", () => {
     );
     console.log(`execute ${output[0]}`);
     console.log(`withdraw amount is ${output[1]}`);
-
+    
+  if(output[0]== BigInt(0))
+  {
     try {
       // Monitor BEFORE
       await getComprehensiveStatus("BEFORE SWAP");
@@ -780,6 +782,10 @@ describe("WhisprLimit", () => {
     } catch (error) {
       console.error("UNIT TEST *Swap* ERROR -", error.message);
     }
+  }
+  else{
+    console.log("Swap parameter not satisfied")
+  }
   });
 
   async function initComputeSwapCompDef(

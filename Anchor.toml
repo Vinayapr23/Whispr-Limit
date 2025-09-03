@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-whispr_limit = "ANiRvrRWgEbLL9BUqqgr8mhbNhbX1dzPdph9UiQtubRt"
+whispr_limit = "98Yy1MEB7nKGECxQXoAJGjrBngvsX5hjMkXESrR3stDs"
 
 [registry]
 url = "https://api.apr.dev"
@@ -18,40 +18,39 @@ wallet = "~/.config/solana/id.json"
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+upgradeable = false
 
-# Raydium CPMM Program
 [[test.genesis]]
 address = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
 program = "raydium_dumps/raydium_cpmm.so"
 
-# Lock CPMM Program
 [[test.genesis]]
 address = "LockrWmn6K5twhz3y9w1dQERbmgSaRkfnTeTKbpofwE"
 program = "raydium_dumps/lock_cpmm.so"
 
-# Token Metadata Program
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 program = "raydium_dumps/metadata.so"
 
-# Memo Program
 [[test.genesis]]
 address = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
 program = "raydium_dumps/memo.so"
 
+bind_address = "0.0.0.0"
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
 
-
-# Create Pool Fee Receiver Account
 [[test.validator.account]]
 address = "DNXgeM9EiiaAbaWvwjHj9fQQLAX5ZsfHyvmYUNRAdNC8"
 filename = "raydium_dumps/create_pool_fee.json"
 
-# Raydium AMM Config Account
 [[test.validator.account]]
 address = "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2"
 filename = "raydium_dumps/amm_config.json"
 
-# Lock CPMM Authority Account
 [[test.validator.account]]
 address = "3f7GcQFG397GAaEnv51zR6tsTVihYRydnydDD1cXekxH"
 filename = "raydium_dumps/lock_authority.json"
